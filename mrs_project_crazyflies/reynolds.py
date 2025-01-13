@@ -9,7 +9,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from nav_msgs.msg import Odometry
 from dataclasses import dataclass
 import math
-from mrs_project.svc import StateValidityChecker
+from mrs_project_crazyflies.svc import StateValidityChecker
 
 @dataclass
 class BoidState:
@@ -278,7 +278,7 @@ class BoidController(Node):
             # Create a unique marker for each velocity
             marker = Marker()
             marker.header.frame_id = f"cf_{self.id}/base_link"  # Replace with your frame ID
-            marker.header.stamp = rospy.Time.now()
+            # marker.header.stamp = rospy.Time.now()
             marker.ns = "velocity_arrows"
             marker.id = i
             marker.type = Marker.ARROW

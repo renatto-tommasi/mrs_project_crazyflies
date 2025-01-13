@@ -16,7 +16,7 @@ def generate_launch_description():
     # Create multiple boid nodes
     boid_nodes = [
         Node(
-            package='mrs_project',
+            package='mrs_project_crazyflies',
             namespace=f'boid{i+1}',
             executable='reynolds',
             name='reynolds_sim',

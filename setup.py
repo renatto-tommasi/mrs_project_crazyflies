@@ -40,7 +40,8 @@ setup(
         # Define console scripts (entry points)
         entry_points={
             'console_scripts': [
-                'reynolds = mrs_project_crazyflies.reynolds:main'  # Make sure `mrs_project.reynolds.main` exists
+                'reynolds = mrs_project_crazyflies.reynolds:main',
+                'consensus_formation = mrs_project_crazyflies.consensus_formation:main' 
             ],
         },
 )

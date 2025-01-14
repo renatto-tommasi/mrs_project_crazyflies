@@ -1,13 +1,26 @@
 import rclpy
 from rclpy.node import Node
 
+from geometry_msgs.msg import Pose, Twist, PoseStamped, Point
+
 class ConsensusFormationController(Node):
     def __init__(self):
         super().__init__('reynolds_sim')
 
         self.get_logger().info(f"Consensus Rendezvous Controller started correctly!")
+        num_of_robots = 4
+
+        # PUBLISHERS
+        self.vel_publishers = [self.create_publisher(Twist, f"/cr_{i}/cmd_vel", 10) for i in range(num_of_robots)]
+
+        # SUBSCRIBERS
+
+
+
 
         self.num_of_robots = 4 # Manual for now
+
+    
 
     def set_formation(self, formation):
         """
@@ -44,15 +57,21 @@ class ConsensusFormationController(Node):
         #TODO: Calculate the velocities for each agent using the equation in the slides
         pass
 
-    def send_velocities(self, V):
+    def send_velocities(self, linear_x=0.5, angular_z=0.0):
         """
         Description: This function publishes the velocity to each boid
         Input: 
             V: nd.array (n,2) -> velocities vector
 
         """
-        #TODO: use a publisher to access all boid velocities
-        pass
+        # Create the Twist message
+        twist_msg = Twist()
+        twist_msg.linear.x = linear_x
+        twist_msg.angular.z = angular_z
+
+        # Publish the same message to all publishers
+        for publisher in self.vel_publishers:
+            publisher.publish(twist_msg)
 
 
 

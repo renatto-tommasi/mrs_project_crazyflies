@@ -3,9 +3,9 @@ from rclpy.node import Node
 
 from geometry_msgs.msg import Pose, Twist, PoseStamped, Point
 
-class ConsensusFormationController(Node):
+class ConsensusRendezvousController(Node):
     def __init__(self):
-        super().__init__('reynolds_sim')
+        super().__init__('consensus_rendezvous')
 
         self.get_logger().info(f"Consensus Rendezvous Controller started correctly!")
         num_of_robots = 4
@@ -15,7 +15,7 @@ class ConsensusFormationController(Node):
 
         # SUBSCRIBERS
 
-
+        self.send_velocities()
 
 
         self.num_of_robots = 4 # Manual for now
@@ -79,7 +79,7 @@ def main(args=None):
     rclpy.init(args=args)
     
     # Instantiate the Consensus Controller
-    controller = ConsensusFormationController()
+    controller = ConsensusRendezvousController()
 
     # Keep the node alive until manually interrupted
     rclpy.spin(controller)

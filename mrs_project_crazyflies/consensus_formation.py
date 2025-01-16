@@ -22,6 +22,8 @@ class ConsensusFormationController(Node):
         self.A = None
         self.goal = None
 
+        self.leader = "cf_4"
+
         self.target = np.array([-1,1])
 
         self.dt = 0.1
@@ -140,7 +142,7 @@ class ConsensusFormationController(Node):
         return V
     
     def calculate_goal_vel(self):
-        drone_0 = self.X["cf_1"]
+        drone_0 = self.X[self.leader]
         vector = self.goal - drone_0[:2]
         mig_acc = vector / np.linalg.norm(vector)
 
@@ -157,13 +159,6 @@ class ConsensusFormationController(Node):
 
         return mig_acc * self.dt
 
-    def to_world_frame(self, xi):
-        
-        origin = self.X["cf_1"][:2]  # Get the first 2 elements
-        transform = np.zeros_like(xi)
-        for i in range(self.num_of_robots):
-            transform[i] = xi[i] + origin
-        return transform
 
     def update_vel(self):
         for drone, velocity in self.vel.items():
@@ -195,7 +190,7 @@ class ConsensusFormationController(Node):
         self.vel = self._matrix_to_dictionary(V)
 
         if self.goal is not None:
-            self.vel["cf_1"] = self.calculate_goal_vel()
+            self.vel[self.leader] = self.calculate_goal_vel()
 
         self.get_logger().info(f"Robots Velocity: current={self.vel}")
 
@@ -244,8 +239,8 @@ class ConsensusFormationController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    topology = 2        # Define several topologies
-    formation = 1
+    topology = 1       # Define several topologies
+    formation = 2
     # Instantiate the Consensus Controller
     controller = ConsensusFormationController()
     controller.launch_drones()

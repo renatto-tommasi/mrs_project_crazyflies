@@ -76,8 +76,18 @@ class ConsensusRendezvousController(Node):
         Update:
             self.A: nd.array (n,n) -> adjacency matrix
         """
-        #TODO: Build the position vector for each of the agents
-        pass
+        if topology == 1:
+            self.A = np.array([[0, 1, 0, 0],
+                             [0, 0, 1, 0],
+                             [0, 0, 0, 1],
+                             [1, 0, 0, 0]])  # Ring topology
+        elif topology == 2:
+            self.A = np.array([[0, 1, 0, 1],
+                             [1, 0, 1, 0],
+                             [0, 1, 0, 1],
+                             [1, 0, 1, 0]])  # Fully connected directed topology
+        else:
+            raise ValueError("Invalid choice. Please select 1 or 2.")
 
 
     def calculate_rendezvous_vel(self):
@@ -99,7 +109,13 @@ class ConsensusRendezvousController(Node):
 
 
         #TODO: Calculate the velocities for each agent using the equation in the slides
-        V = np.array([])
+        degree_matrix = np.diag(np.sum(self.A, axis=1))
+        laplacian_matrix = degree_matrix - self.A
+
+        self.get_logger().error(f"L: {laplacian_matrix}, X: {X[:,:2]}")
+
+
+        V = -np.dot(laplacian_matrix, (X[:,:2]))*self.dt
 
         
 
@@ -148,7 +164,7 @@ class ConsensusRendezvousController(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    topology = ""           # Define several topologies
+    topology = 1           # Define several topologies
     
     # Instantiate the Consensus Controller
     controller = ConsensusRendezvousController()

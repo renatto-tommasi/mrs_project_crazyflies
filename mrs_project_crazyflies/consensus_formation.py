@@ -16,10 +16,12 @@ class ConsensusFormationController(Node):
 
         self.num_of_robots = 4 # Manual for now
 
-        self.vel = {}       # Boid Velocities
-        self.X = {}         # Boid Locations
+        self.vel = {}               # Boid Velocities
+        self.X = {}                 # Boid Locations
         self.formation = None
         self.A = None
+
+        self.target = np.array([-1,1])
 
         self.dt = 0.1
 
@@ -89,9 +91,9 @@ class ConsensusFormationController(Node):
         scale = 2
         if formation == 1:  # Triangle
             formation = np.array([[0, 0],
-                                [1, 0],
-                                [0.5, np.sqrt(3) / 2],
-                                [0.5, np.sqrt(3) / 4]])/scale
+                                [1, 1],
+                                [1, 2],
+                                [2, 0]])
         elif formation == 2:  # Line
             formation = np.array([[0, 0],
                                 [1, 0],
@@ -105,7 +107,7 @@ class ConsensusFormationController(Node):
         else:
             raise ValueError("Invalid formation type. Please select 1, 2, or 3.")
 
-        self.formation = formation - np.mean(formation, axis=0)  # Center the formation
+        self.formation = formation # Center the formation
 
     def calculate_formation_vel(self, X, xi):
         """
@@ -118,21 +120,24 @@ class ConsensusFormationController(Node):
             V: nd.array (n,2) -> velocities vector
         """
         V = np.zeros_like(X[:, :2])
-        # self.get_logger().error(f"xi = {xi} X = {X}")
 
-        for i in range(self.num_of_robots):
-            # Error between current and desired position
-            # self.get_logger().error(f"xi_i = {xi[i,:2]} X_i = {X[i,:2]}")
-            position_error = xi[i,:2] - X[i,:2]
-            # Consensus term (weighted by adjacency matrix)
-            consensus_term = np.zeros(2)
-            for j in range(self.num_of_robots):
-                if self.A[i, j] > 0:
-                    consensus_term += self.A[i, j] * (X[j,:2] - X[i,:2])
-            # Combine error and consensus terms
-            # self.get_logger().info(f"position_error = {position_error} X_i = {consensus_term}")
-            V[i,:] = self.dt * (position_error + consensus_term)
+        degree_matrix = np.diag(np.sum(self.A, axis=1))
+        laplacian_matrix = degree_matrix - self.A
+
+        self.get_logger().error(f"L: {laplacian_matrix}, X: {X[:,:2]}, xi:{xi}")
+
+
+        V = -np.dot(laplacian_matrix, (X[:,:2] - xi))*self.dt
+
         return V
+
+    def to_world_frame(self, xi):
+        
+        origin = self.X["cf_1"][:2]  # Get the first 2 elements
+        transform = np.zeros_like(xi)
+        for i in range(self.num_of_robots):
+            transform[i] = xi[i] + origin
+        return transform
 
     def update_vel(self):
         for drone, velocity in self.vel.items():
@@ -152,13 +157,13 @@ class ConsensusFormationController(Node):
         # Current positions
         X = self._dictionary_to_matrix(self.X)
         # Desired positions
-        xi = self.A
+        xi = self.formation
         if X.size == 0:
             raise ValueError("Tf transforms are not being published. Restart the simulation!")
         if xi is None:
             self.get_logger().error("X or xi is None. Ensure proper initialization.")
             return
-        self.get_logger().info(f"Robots position: current={X}, desired={xi}")
+        # self.get_logger().info(f"Robots position: current={X}, desired={xi}")
         # Calculate velocities
         V = self.calculate_formation_vel(X, xi)
         # Send velocities
@@ -211,7 +216,7 @@ class ConsensusFormationController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    topology = 1          # Define several topologies
+    topology = 1         # Define several topologies
     formation = 1
     # Instantiate the Consensus Controller
     controller = ConsensusFormationController()

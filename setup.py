@@ -19,6 +19,7 @@ setup(
 
             # Optionally add the launch files and other necessary files
             ('share/' + package_name + '/launch', ['launch/reynolds.launch.py']),
+            ('share/' + package_name + '/launch', ['launch/simulation.launch.py']),
         ],
         
         install_requires=['setuptools'],

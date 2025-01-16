@@ -86,6 +86,13 @@ class ConsensusRendezvousController(Node):
                              [1, 0, 1, 0],
                              [0, 1, 0, 1],
                              [1, 0, 1, 0]])  # Fully connected directed topology
+            
+        elif topology == 3:
+            self.A = np.array([[0, 0, 0, 1],
+                             [0, 0, 0, 0],
+                             [0, 1, 0, 0],
+                             [0, 0, 1, 0]])  # II: 1->4->3->2
+
         else:
             raise ValueError("Invalid choice. Please select 1 or 2.")
 
@@ -108,7 +115,6 @@ class ConsensusRendezvousController(Node):
         X = self._dictionary_to_matrix(self.X) # Changes the Dictionary into a Matrix compatible with the drones in order
 
 
-        #TODO: Calculate the velocities for each agent using the equation in the slides
         degree_matrix = np.diag(np.sum(self.A, axis=1))
         laplacian_matrix = degree_matrix - self.A
 
@@ -164,7 +170,7 @@ class ConsensusRendezvousController(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    topology = 1           # Define several topologies
+    topology = 3          # Define several topologies
     
     # Instantiate the Consensus Controller
     controller = ConsensusRendezvousController()

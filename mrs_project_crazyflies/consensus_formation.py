@@ -99,20 +99,20 @@ class ConsensusFormationController(Node):
             xi: nd.array (n,2) -> positions vector
         """
         scale = 2
-        if formation == 1:  # Triangle
+        if formation == "triangle":  # Triangle
             formation = np.array([[0, 0],
                                 [1, 1],
                                 [1, 2],
                                 [2, 0]])
-        elif formation == 2:  # Line
+        elif formation == "line":  # Line
             formation = np.array([[0, 0],
                                 [1, 0],
                                 [2, 0],
                                 [3, 0]])/scale
-        elif formation == 3:  # Square
-            formation = np.array([[0, 0],
+        elif formation == "square":  # Square
+            formation = np.array([[1, 1],
                                 [1, 0],
-                                [1, 1],
+                                [0, 0],
                                 [0, 1]])/scale
         else:
             raise ValueError("Invalid formation type. Please select 1, 2, or 3.")
@@ -239,8 +239,8 @@ class ConsensusFormationController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    topology = 1       # Define several topologies
-    formation = 2
+    topology = 1      # Define several topologies
+    formation = "square"
     # Instantiate the Consensus Controller
     controller = ConsensusFormationController()
     controller.launch_drones()

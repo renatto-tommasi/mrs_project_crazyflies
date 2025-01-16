@@ -20,6 +20,7 @@ class ConsensusFormationController(Node):
         self.X = {}                 # Boid Locations
         self.formation = None
         self.A = None
+        self.goal = None
 
         self.target = np.array([-1,1])
 
@@ -31,11 +32,18 @@ class ConsensusFormationController(Node):
 
         # SUBSCRIBERS
         self.odom_subscribers = [self.create_subscription(Odometry, f"/cf_{i+1}/odom",self.store_odom, 10) for i in range(self.num_of_robots)]
+        self.goal_sub = self.create_subscription(PoseStamped, "/goal_pose", self.set_goal, 10)
 
         # # TIMERS
         self.delay = 5      # seconds
         self.delay_counter = 0
         self.timer = self.create_timer(self.dt, self.control_loop)
+
+    def set_goal(self, goal: PoseStamped):
+        x_goal_wf = goal.pose.position.x
+        y_goal_wf = goal.pose.position.y
+        self.goal = np.array([x_goal_wf, y_goal_wf])
+        
 
     def store_odom(self, msg:Odometry):
         """
@@ -130,6 +138,24 @@ class ConsensusFormationController(Node):
         V = -np.dot(laplacian_matrix, (X[:,:2] - xi))*self.dt
 
         return V
+    
+    def calculate_goal_vel(self):
+        drone_0 = self.X["cf_1"]
+        vector = self.goal - drone_0[:2]
+        mig_acc = vector / np.linalg.norm(vector)
+
+        mig_acc = mig_acc * np.linalg.norm(vector)**2
+
+        # Clip the acceleration magnitude to 1 m/s²
+        max_acc = 1.0  # Maximum allowed acceleration in m/s²
+        acc_norm = np.linalg.norm(mig_acc)
+        
+        if acc_norm > max_acc:
+            mig_acc = (mig_acc / acc_norm) * max_acc
+
+        self.get_logger().error(f"Mig: {mig_acc * self.dt}")
+
+        return mig_acc * self.dt
 
     def to_world_frame(self, xi):
         
@@ -142,9 +168,8 @@ class ConsensusFormationController(Node):
     def update_vel(self):
         for drone, velocity in self.vel.items():
             twist_vel = Twist()
-            twist_vel.linear.x = velocity[0]
-            twist_vel.linear.y = velocity[1]
-
+            twist_vel.linear.x = float(velocity[0])
+            twist_vel.linear.y = float(velocity[1])
 
             self.vel_publishers[drone].publish(twist_vel)
 
@@ -168,6 +193,9 @@ class ConsensusFormationController(Node):
         V = self.calculate_formation_vel(X, xi)
         # Send velocities
         self.vel = self._matrix_to_dictionary(V)
+
+        if self.goal is not None:
+            self.vel["cf_1"] = self.calculate_goal_vel()
 
         self.get_logger().info(f"Robots Velocity: current={self.vel}")
 
@@ -216,7 +244,7 @@ class ConsensusFormationController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    topology = 1         # Define several topologies
+    topology = 2        # Define several topologies
     formation = 1
     # Instantiate the Consensus Controller
     controller = ConsensusFormationController()

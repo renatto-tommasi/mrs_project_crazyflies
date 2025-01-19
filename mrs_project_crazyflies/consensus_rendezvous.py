@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import Pose, Twist, PoseStamped, Point
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 
 import numpy as np
 
@@ -33,6 +33,16 @@ class ConsensusRendezvousController(Node):
         self.delay_counter = 0
         self.timer = self.create_timer(self.dt, self.calculate_rendezvous_vel)
 
+        self.robot_paths = {}
+        self.path_publishers = {}
+
+        # PLOT PATHS IN RVIZ
+
+        # Create publishers for each robot's path
+        self.robot_paths = {f"cf_{i+1}": Path() for i in range(self.num_of_robots)}
+        self.path_publishers = {f"cf_{i+1}": self.create_publisher(Path, f"/cf_{i+1}/path", 10) for i in range(self.num_of_robots)}
+
+
     
 
     def update_vel(self):
@@ -62,7 +72,17 @@ class ConsensusRendezvousController(Node):
             self.get_logger().info(f"{frame} has not launched, attempting again")
             self.launch_drones()
             
-        # self.get_logger().info(f"{frame} has x:{x}, y:{y}, z:{z}")
+        # PLOT PATH
+        pose = PoseStamped()
+        pose.header = msg.header
+        pose.pose = msg.pose.pose
+
+        # Append the pose to the robot's path
+        self.robot_paths[frame].header = msg.header
+        self.robot_paths[frame].poses.append(pose)
+
+        # Publish the updated path
+        self.path_publishers[frame].publish(self.robot_paths[frame])
 
 
     
@@ -92,6 +112,11 @@ class ConsensusRendezvousController(Node):
                              [0, 0, 0, 0],
                              [0, 1, 0, 0],
                              [0, 0, 1, 0]])  # II: 1->4->3->2
+        elif topology == 4:
+            self.A = np.array([[0, 0, 1, 0],
+                             [1, 0, 0, 0],
+                             [0, 1, 0, 1],
+                             [0, 0, 0, 0]])  # II: 1->4->3->2
 
         else:
             raise ValueError("Invalid choice. Please select 1 or 2.")
@@ -121,7 +146,8 @@ class ConsensusRendezvousController(Node):
         self.get_logger().error(f"L: {laplacian_matrix}, X: {X[:,:2]}")
 
 
-        V = -np.dot(laplacian_matrix, (X[:,:2]))*self.dt
+        V = -np.dot(laplacian_matrix, (X[:,:2]))*self.dt * 0.1
+
 
         
 
@@ -170,7 +196,10 @@ class ConsensusRendezvousController(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    topology = 3          # Define several topologies
+    # Get topology and formation from command line arguments
+    node = Node("consensus_formation_controller")  # Create a temporary node for argument parsing
+    topology = node.declare_parameter('topology', 1).value
+    node.destroy_node()  # Destroy the temporary node
     
     # Instantiate the Consensus Controller
     controller = ConsensusRendezvousController()

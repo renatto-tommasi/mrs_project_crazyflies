@@ -29,7 +29,7 @@ class ConsensusFormationController(Node):
         self.dt = 0.1
 
         # PUBLISHERS
-        self.vel_publishers = {f"cf_{i+1}": self.create_publisher(Twist, f"/cf_{i+1}/cmd_vel", 10) for i in range(self.num_of_robots)}
+        self.vel_publishers = {f"cf_{i+1}": self.create_publisher(Twist, f"/cf_{i+1}/consensus_vel", 10) for i in range(self.num_of_robots)}
     
 
         # SUBSCRIBERS
@@ -37,7 +37,7 @@ class ConsensusFormationController(Node):
         self.goal_sub = self.create_subscription(PoseStamped, "/goal_pose", self.set_goal, 10)
 
         # # TIMERS
-        self.delay = 5      # seconds
+        self.delay = 2     # seconds
         self.delay_counter = 0
         self.timer = self.create_timer(self.dt, self.control_loop)
 
@@ -108,12 +108,12 @@ class ConsensusFormationController(Node):
             formation = np.array([[0, 0],
                                 [1, 0],
                                 [2, 0],
-                                [3, 0]])/scale
+                                [3, 0]])
         elif formation == "square":  # Square
-            formation = np.array([[1, 1],
+            formation = np.array([[0, 1],
+                                [1, 1],
                                 [1, 0],
-                                [0, 0],
-                                [0, 1]])/scale
+                                [0, 0]])*2
         else:
             raise ValueError("Invalid formation type. Please select 1, 2, or 3.")
 
@@ -239,11 +239,14 @@ class ConsensusFormationController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    topology = 1      # Define several topologies
-    formation = "square"
+    # Get topology and formation from command line arguments
+    node = Node("consensus_formation_controller")  # Create a temporary node for argument parsing
+    topology = node.declare_parameter('topology', 1).value
+    formation = node.declare_parameter('formation', 'square').value
+    node.destroy_node()  # Destroy the temporary node
     # Instantiate the Consensus Controller
     controller = ConsensusFormationController()
-    controller.launch_drones()
+    # controller.launch_drones()
     controller.set_topology(topology)
     controller.set_formation(formation)
 

@@ -3,20 +3,16 @@ import numpy as np
 
 class StateValidityChecker:
 
-    def __init__(self, node, robot_dim=(1, 1)): # Pass the node instance
-        self.node = node # Store the node instance
+    def __init__(self, map, robot_dim=(1, 1)): # Pass the node instance
+        
         self.map = None
         self.map_dim = None
         self.robot_dim = robot_dim
         self.map_resolution = None
         self.origin = None
 
-        # Create a subscription using the provided node
-        self.map_subscription = self.node.create_subscription(
-            OccupancyGrid,
-            '/map',
-            self.save_map,
-            10)  # QoS profile
+        self.save_map(map)
+
 
     def save_map(self, msg: OccupancyGrid):
         self.map = np.array(msg.data).reshape(msg.info.height, msg.info.width)

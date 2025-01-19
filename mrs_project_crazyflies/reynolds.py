@@ -6,7 +6,7 @@ from rclpy.node import Node
 import numpy as np
 from geometry_msgs.msg import Pose, Twist, PoseStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, OccupancyGrid
 from dataclasses import dataclass
 import math
 from mrs_project_crazyflies.svc import StateValidityChecker
@@ -29,16 +29,18 @@ BEHAVIOR_COLORS = [
 
 
 class BoidController(Node):
-    def __init__(self, k_all=0.2, k_sep=0.3, k_coh=0.6, k_mig=0.8, k_obs=2):
-        super().__init__('reynolds_sim')
+    def __init__(self, k_all=0.2, k_sep=0.3, k_coh=0.7, k_mig=0.7, k_obs=2):
+        super().__init__('reynolds_controller')
 
         # Declare parameters with default values
         self.declare_parameter('num_of_robots', 4)  # Default to 4 robots
         self.declare_parameter('robot_id', 0)  # Default to robot_id 0
 
         # Get parameters from the launch file
-        num_of_robots = self.get_parameter('num_of_robots').value
-        self.id = self.get_parameter('robot_id').value
+        self.num_of_robots = self.get_parameter('num_of_robots').value
+        id = self.get_parameter('robot_id').value
+
+        self.drone = f"cf_{id}"
 
         # Tuning parameters
         self.k_sep = k_sep
@@ -46,82 +48,109 @@ class BoidController(Node):
         self.k_coh = k_coh
         self.k_mig = k_mig
         self.k_obs = k_obs
+        self.vp = 10
+        self.timeout = 1
 
         self.neighbors = {}
-        self.p_wf = np.array([0.0, 0.0, 0.0]).reshape(3, 1)  # Boid Position in World Frame x, y, theta
+        self.p_wf = None  # Boid Position in World Frame x, y, theta
         self.orientation = 0.0
         self.vel = np.array([0.0, 0.0]).reshape(2, 1)
         self.migration_target = None
-        self.max_speed = 1
+        self.max_speed = 0.5
 
-        self.get_logger().info(f"Node {self.id} / {num_of_robots} started correctly!")
-        self.state_checker = StateValidityChecker(self)
+        self.consensus_vel = None
+
+        self.get_logger().info(f"Node {self.drone} started correctly!")
+        self.state_checker = None
 
 
         # Publishers
-        self.vel_pub = self.create_publisher(Twist, f"/cf_{self.id}/cmd_vel", 10)
-        vel_msg = Twist()
-        self.get_logger().info(f"Node {self.id} is trying {self.vel[0]}!")
-        vel_msg.linear.x = float(1)
-        vel_msg.linear.y = float(1)
-        vel_msg.linear.z = float(1)
+        self.vel_pub = self.create_publisher(Twist, f"/{self.drone}/cmd_vel", 10)
+        self.marker_pub = self.create_publisher(MarkerArray, f"/{self.drone}/velocity_marker", 10)
+        
 
-
-        self.vel_pub.publish(vel_msg)
-
-        self.marker_pub = self.create_publisher(MarkerArray, f"/cf_{self.id}/velocity_marker", 10)
-
-        # Subscribers
-        self.odom_sub = self.create_subscription(Odometry, f"/cf_{self.id}/odom", self.get_odom, 10)
-        self.goal_sub = self.create_subscription(PoseStamped, "/move_base_simple/goal", self.migratory_urge, 10)
-
-        self.neighbors_subs = []  # Initialize as an empty list
-        for i in range(num_of_robots):
-            if i != self.id:  # Use self.id for comparison
-                subscription = self.create_subscription(Odometry, f"/cf_{i+1}/odom", self.get_neighbors_callback(i+1), 10)
-                self.neighbors_subs.append(subscription)  # Append the subscription to the list
+        # SUBSCRIBERS
+        self.neighbors_subs = [self.create_subscription(Odometry, f"/cf_{i+1}/odom",self.get_odom_callback, 10) for i in range(self.num_of_robots)]
+        self.goal_sub = self.create_subscription(PoseStamped, "/goal_pose", self.migratory_urge, 10)
+        self.consensus_sub = self.create_subscription(Twist, f"/{self.drone}/consensus_vel", self.consensus_control, 10)
+        self.map_subscription = self.create_subscription(
+            OccupancyGrid,
+            '/map',
+            self.save_map,
+            10)  # QoS profile
 
         self.dt = 0.1
 
+        # TIMERS
+        self.delay = 5      # seconds
+        self.delay_counter = 0
+        self.timer = self.create_timer(self.dt, self.reynolds)
+        self.chek_consensus = self.create_timer(0.5, self.check_topic_activity)  # Check every 1 second
 
-    def get_odom(self, odom: Odometry):
-        p_x_wf = odom.pose.pose.position.x
-        p_y_wf = odom.pose.pose.position.y
-        vl_x = odom.twist.twist.linear.x
-        vl_y = odom.twist.twist.linear.y
 
-        self.vel = np.array([vl_x, vl_y]).reshape(2, 1)
-        self.orientation = self.get_orientation(self.vel)
-        self.p_wf = np.array([p_x_wf, p_y_wf, self.orientation]).reshape(3, 1)
+    def save_map(self, map:OccupancyGrid):
+        self.get_logger().info(f"Node {self.drone} GOT MAP!!!")
 
-        self.reynolds()
+        self.state_checker = StateValidityChecker(map)
+
+    def consensus_control (self, msg:Twist):
+        self.vp = 0.5
+        self.consensus_vel = np.array([msg.linear.x, msg.linear.y]).reshape((2,1))
+        self.destroy_subscription(self.goal_sub)
+        self.last_message_time = self.get_clock().now()
+
+
+    def check_topic_activity(self):
+        if self.consensus_vel is None:
+            return
+        
+        time_diff = self.get_clock().now() - self.last_message_time
+        if time_diff.nanoseconds / 1e9 > self.timeout:
+            self.vp = 20
+    
+            self.goal_sub = self.create_subscription(PoseStamped, "/goal_pose", self.migratory_urge, 10)
+            self.consensus_vel = None
+            
+
 
     def migratory_urge(self, goal: PoseStamped):
         x_goal_wf = goal.pose.position.x
         y_goal_wf = goal.pose.position.y
         self.migration_target = np.array([x_goal_wf, y_goal_wf]).reshape(2, 1)
 
-    def get_neighbors_callback(self, n_id):
-        def callback(n_odom: Odometry):
-            n_pos_rf = np.array([0.0, 0.0, 0.0]).reshape(3, 1)
-            n_x_wf = n_odom.pose.pose.position.x
-            n_y_wf = n_odom.pose.pose.position.y
-            vel = self.get_neighbors_vel(n_odom)
+    def get_odom_callback(self, msg:Odometry):
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
+        vl_x = msg.twist.twist.linear.x
+        vl_y = msg.twist.twist.linear.y
+        frame = msg.child_frame_id
 
-            n_pos_wf = np.array([n_x_wf, n_y_wf]).reshape(2, 1)
-            n_pos_rf[:2] = n_pos_wf - self.p_wf[:2]
-            n_pos_rf[2] = np.arctan2(n_pos_rf[1], n_pos_rf[0]) - self.orientation
-
-            n_dist = np.linalg.norm(n_pos_rf[:2])
-            if self.is_visible(n_dist, n_pos_rf[2]):
-                self.neighbors[n_id] = BoidState(pos=n_pos_rf, vel=vel, dist=n_dist)
-            elif n_id in self.neighbors:
-                del self.neighbors[n_id]
-            self.get_logger().info(f"Boid {self.id} has {len(self.neighbors)} Neighbors!")
-        return callback
+        if frame == self.drone:
+            self.vel = np.array([vl_x, vl_y]).reshape(2, 1)
+            self.orientation = self.get_orientation(self.vel)
+            self.p_wf = np.array([x, y, self.orientation]).reshape(3, 1)
+            return
         
+        if self.p_wf is None:
+            return
+        
+        vel = np.array([vl_x, vl_y]).reshape(2, 1)
+        n_pos_rf = np.array([0.0, 0.0, 0.0]).reshape(3, 1)
 
-    def is_visible(self, n_dist, angle, max_distance=2.0, field_of_view=np.pi):
+        n_pos_wf = np.array([x, y]).reshape(2, 1)
+        n_pos_rf[:2] = n_pos_wf - self.p_wf[:2]
+        n_pos_rf[2] = np.arctan2(n_pos_rf[1], n_pos_rf[0]) - self.orientation
+        n_dist = np.linalg.norm(n_pos_rf[:2])
+
+        if self.is_visible(n_dist, n_pos_rf[2], self.vp):
+                self.neighbors[frame] = BoidState(pos=n_pos_rf, vel=vel, dist=n_dist)
+        elif frame in self.neighbors:
+                del self.neighbors[frame]
+
+        # self.get_logger().info(f"Boid {self.drone} has {(self.neighbors)} Neighbors!")
+
+
+    def is_visible(self, n_dist, angle, max_distance=1, field_of_view=np.pi):
         return n_dist <= max_distance and -field_of_view <= angle <= field_of_view
 
     def get_orientation(self, vel):
@@ -133,20 +162,28 @@ class BoidController(Node):
         return np.array([n_odom.twist.twist.linear.x, n_odom.twist.twist.linear.y]).reshape(2, 1)
 
     def reynolds(self):
-        allignment_acc = self.get_allignment_acc()
-        cohesion_acc = self.get_cohesion_acc()
-        separation_acc = self.get_separation_acc()
-        migration_acc = self.get_migration_acc()
-        obstacle_acc = np.zeros((2,1)) #self.get_obstacle_avoidance()
+        if self.delay_counter < self.delay/self.dt:
+            self.delay_counter += 1
+            return
+
+        allignment_acc = self.get_allignment_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
+        cohesion_acc = self.get_cohesion_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
+        separation_acc = self.get_separation_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
+        migration_acc = self.get_migration_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
+        obstacle_acc = self.get_obstacle_avoidance() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
+
         vel = self.calculate_vel(allignment_acc, cohesion_acc, separation_acc, migration_acc, obstacle_acc)
+
         speed = np.linalg.norm(vel)
+
         if speed > self.max_speed:
             vel = vel / speed * self.max_speed
+
         self.publish_vel(vel)
 
 
 
-    def getAllignmentAcc(self):
+    def get_allignment_acc(self):
         '''
         Matches the velocity of the neighbors
         '''
@@ -155,7 +192,7 @@ class BoidController(Node):
         vel_all = np.zeros((2,1))
         
         if len(self.neighbors) > 0:
-            for _, agent in self.neighbors.items():
+            for agent in self.neighbors.values():
                 vel_all += agent.vel
             # Normalize by total weight if it's greater than zero
             allignment_vel = vel_all / len(self.neighbors)
@@ -165,26 +202,26 @@ class BoidController(Node):
 
         return allignment_acc   
     
-    def getCohesionAcc(self):
+    def get_cohesion_acc(self):
         coh_acc = np.zeros((2,1))
         center_of_mass = np.zeros((2, 1))  # Initialize center of mass to zero
         num_neighbors = len(self.neighbors)
 
         if num_neighbors > 0:
             # Calculate the center of mass
-            for _, agent in self.neighbors.items():
+            for agent in self.neighbors.values():
                 center_of_mass += agent.pos[:2]
             center_of_mass /= num_neighbors + 1  # Average position of neighbors
 
         coh_acc = center_of_mass 
         return coh_acc
     
-    def getSeparationAcc(self):
+    def get_separation_acc(self):
         sep_acc = np.zeros((2,1))
         num_neighbors = len(self.neighbors)
 
         if num_neighbors > 0:
-            for _, agent in self.neighbors.items():
+            for agent in self.neighbors.values():
                 direction_vector = -agent.pos[:2] / agent.dist
 
                 sep_acc += (1/agent.dist**2) * direction_vector
@@ -193,7 +230,7 @@ class BoidController(Node):
 
         return sep_acc
     
-    def getMigrationAcc(self):
+    def get_migration_acc(self):
 
         if self.migration_target is None:
             return np.zeros((2,1))
@@ -205,7 +242,10 @@ class BoidController(Node):
 
         return mig_acc * np.linalg.norm(vector)**2
     
-    def getObstacleAvoidance(self):
+    def get_obstacle_avoidance(self):
+        if self.state_checker is None:
+            # self.get_logger().error(f"State Checker is still none in {self.drone}")
+            return np.zeros((2, 1))
         obs_acc = np.zeros((2, 1))             # Initialize acceleration vector
         obstacle_distance = 0.4                  # The maximum distance to check for obstacles
         resolution = self.state_checker.map_resolution
@@ -234,11 +274,22 @@ class BoidController(Node):
         return obs_acc
 
     
-    def calculateVel(self, allignment_acc, cohesion_acc, separation_acc, migration_acc, obstacle_acc):
+    def calculate_vel(self, allignment_acc, cohesion_acc, separation_acc, migration_acc, obstacle_acc):
+
+        if self.consensus_vel is not None:
+            self.get_logger().info(f"Calculating Consensus Velocities")
+
+            force_acc = 0.6 * separation_acc 
+            agent_vel = force_acc*self.dt + self.consensus_vel*0.6
+
+
+            return agent_vel
         
+        self.get_logger().info(f"Calculating Reynolds Velocities")
+
         force_acc = self.k_coh * cohesion_acc + self.k_sep * separation_acc + self.k_all * allignment_acc + self.k_mig * migration_acc + self.k_obs * obstacle_acc
 
-        agent_vel = force_acc 
+        agent_vel = force_acc * self.dt
 
         velocities = [self.k_coh * cohesion_acc,
                       self.k_sep * separation_acc,
@@ -249,16 +300,16 @@ class BoidController(Node):
 
                       ]
 
-        self.publish_velocity_arrows(self.p_wf , velocities)
+        # self.publish_velocity_arrows(self.p_wf , velocities)
 
 
         return agent_vel
     
-    def publishVel(self, vel):
+    def publish_vel(self, vel):
 
         vel_msg = Twist()
-        vel_msg.linear.x = vel[0]
-        vel_msg.linear.y = vel[1]
+        vel_msg.linear.x = float(vel[0])
+        vel_msg.linear.y = float(vel[1])
 
         self.vel_pub.publish(vel_msg)
 
@@ -277,7 +328,7 @@ class BoidController(Node):
         for i, velocity in enumerate(velocities):
             # Create a unique marker for each velocity
             marker = Marker()
-            marker.header.frame_id = f"cf_{self.id}/base_link"  # Replace with your frame ID
+            marker.header.frame_id = f"{self.drone}/base_link"  # Replace with your frame ID
             # marker.header.stamp = rospy.Time.now()
             marker.ns = "velocity_arrows"
             marker.id = i
@@ -313,12 +364,32 @@ class BoidController(Node):
         # Publish the marker array
         self.marker_pub.publish(marker_array)
 
+    def launch_drone(self):
+        """
+        Description: This function publishes the velocity to each boid
+        Input: 
+            V: nd.array (n,2) -> velocities vector
+
+        """
+        linear_z = float(0.5)
+
+
+        # Create the Twist message
+        twist_msg = Twist()
+        twist_msg.linear.z = linear_z
+        
+        self.get_logger().info(f"Launching {self.drone}")
+
+        
+        self.vel_pub.publish(twist_msg)
+
 def main(args=None):
     rclpy.init(args=args)
 
 
     # Instantiate the Boid class
     boid = BoidController()
+    boid.launch_drone()
     # print(f"Node {robot_id} / {num_of_robots} started correctly!")
 
     # Keep the node alive until manually interrupted

@@ -19,7 +19,7 @@ class ConsensusRendezvousController(Node):
 
         self.A = None   # Adjacency Matrix
 
-        self.num_of_robots = 4
+        self.num_of_robots = 3
 
         # PUBLISHERS
         self.vel_publishers = {f"cf_{i+1}": self.create_publisher(Twist, f"/cf_{i+1}/cmd_vel", 10) for i in range(self.num_of_robots)}
@@ -96,30 +96,43 @@ class ConsensusRendezvousController(Node):
         Update:
             self.A: nd.array (n,n) -> adjacency matrix
         """
-        if topology == 1:
-            self.A = np.array([[0, 1, 0, 0],
-                             [0, 0, 1, 0],
-                             [0, 0, 0, 1],
-                             [1, 0, 0, 0]])  # Ring topology
-        elif topology == 2:
-            self.A = np.array([[0, 1, 0, 1],
-                             [1, 0, 1, 0],
-                             [0, 1, 0, 1],
-                             [1, 0, 1, 0]])  # Fully connected directed topology
-            
-        elif topology == 3:
-            self.A = np.array([[0, 0, 0, 1],
-                             [0, 0, 0, 0],
-                             [0, 1, 0, 0],
-                             [0, 0, 1, 0]])  # II: 1->4->3->2
-        elif topology == 4:
-            self.A = np.array([[0, 0, 1, 0],
-                             [1, 0, 0, 0],
-                             [0, 1, 0, 1],
-                             [0, 0, 0, 0]])  # II: 1->4->3->2
+        if self.num_of_robots == 4:
+            if topology == 1:
+                self.A = np.array([[0, 1, 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1],
+                                [1, 0, 0, 0]])  # Ring topology
+            elif topology == 2:
+                self.A = np.array([[0, 1, 0, 1],
+                                [1, 0, 1, 0],
+                                [0, 1, 0, 1],
+                                [1, 0, 1, 0]])  # Fully connected directed topology
+                
+            elif topology == 3:
+                self.A = np.array([[0, 0, 0, 1],
+                                [0, 0, 0, 0],
+                                [0, 1, 0, 0],
+                                [0, 0, 1, 0]])  # II: 1->4->3->2
+            elif topology == 4:
+                self.A = np.array([[0, 0, 1, 0],
+                                [1, 0, 0, 0],
+                                [0, 1, 0, 1],
+                                [0, 0, 0, 0]])  # II: 1->4->3->2
 
-        else:
-            raise ValueError("Invalid choice. Please select 1 or 2.")
+            else:
+                raise ValueError("Invalid choice. Please select 1, 2, 3 or 4.")
+            
+        elif self.num_of_robots == 3:
+            if topology == 1:
+                self.A = np.array([[0, 1, 0],
+                                [0, 0, 1],
+                                [1, 0, 0]])   # Ring topology
+            elif topology == 2:
+                self.A = np.array([[0, 1, 1],
+                                [1, 0, 1],
+                                [1, 1, 0]])  # Fully connected directed topology
+            else:
+                raise ValueError("Invalid choice. Please select 1 or 2.")
 
 
     def calculate_rendezvous_vel(self):

@@ -11,6 +11,11 @@ from dataclasses import dataclass
 import math
 from mrs_project_crazyflies.svc import StateValidityChecker
 
+from crazyflie_interfaces.srv import Land, NotifySetpointsStop
+import signal
+import time
+
+
 @dataclass
 class BoidState:
     pos: np.array
@@ -86,6 +91,12 @@ class BoidController(Node):
         self.delay_counter = 0
         self.timer = self.create_timer(self.dt, self.reynolds)
         self.chek_consensus = self.create_timer(0.5, self.check_topic_activity)  # Check every 1 second
+
+        # Land Services
+        self.notify_clients = [self.create_client(NotifySetpointsStop,f"/cf_{i+1}/notify_setpoints_stop")for i in range(self.num_of_robots)]
+        self.land_clients = [self.create_client(Land,f"/cf_{i+1}/land")for i in range(self.num_of_robots)]
+        # Create a signal handler for SIGINT (Ctrl+C)
+        signal.signal(signal.SIGINT, self.signal_handler)
 
     
     def save_map(self, map:OccupancyGrid):
@@ -387,6 +398,30 @@ class BoidController(Node):
         
         self.vel_pub.publish(twist_msg)
 
+    def land_drones(self):
+        req = NotifySetpointsStop.Request()
+        for client in self.notify_clients:
+            client.call_async(req)
+
+        req = Land.Request()
+        for client in self.land_clients:
+            req.height = 0
+            req.duration = rclpy.duration.Duration(seconds=2.0).to_msg()
+            client.call_async(req)
+        
+        time.sleep(2.0)   
+
+    def signal_handler(self, signum, frame):
+        # Get the logger and log a message
+        self.get_logger().info('Received Ctrl+C, landing drones...')
+
+        # Call the land_drones method
+        self.land_drones()
+
+        # Continue with the shutdown process
+        self.destroy_node()
+        rclpy.shutdown()
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -394,14 +429,9 @@ def main(args=None):
     # Instantiate the Boid class
     boid = BoidController()
     boid.launch_drone()
-    # print(f"Node {robot_id} / {num_of_robots} started correctly!")
 
     # Keep the node alive until manually interrupted
     rclpy.spin(boid)
-
-    # Shutdown
-    boid.destroy_node()
-    rclpy.shutdown()
 
 if __name__ == '__main__':
     main() 

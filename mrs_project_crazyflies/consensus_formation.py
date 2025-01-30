@@ -14,7 +14,7 @@ class ConsensusFormationController(Node):
 
         self.get_logger().info(f"Consensus Formation Controller started correctly!")
 
-        self.num_of_robots = 4 # Manual for now
+        self.num_of_robots = 3 # Manual for now
 
         self.vel = {}               # Boid Velocities
         self.X = {}                 # Boid Locations
@@ -75,18 +75,31 @@ class ConsensusFormationController(Node):
         Update:
             self.A: nd.array (n,n) -> adjacency matrix
         """
-        if topology == 1:
-            self.A = np.array([[0, 1, 0, 0],
-                             [0, 0, 1, 0],
-                             [0, 0, 0, 1],
-                             [1, 0, 0, 0]])  # Ring topology
-        elif topology == 2:
-            self.A = np.array([[0, 1, 0, 1],
-                             [1, 0, 1, 0],
-                             [0, 1, 0, 1],
-                             [1, 0, 1, 0]])  # Fully connected directed topology
-        else:
-            raise ValueError("Invalid choice. Please select 1 or 2.")
+        if self.num_of_robots == 4:
+            if topology == 1:
+                self.A = np.array([[0, 1, 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1],
+                                [1, 0, 0, 0]])  # Ring topology
+            elif topology == 2:
+                self.A = np.array([[0, 1, 0, 1],
+                                [1, 0, 1, 0],
+                                [0, 1, 0, 1],
+                                [1, 0, 1, 0]])  # Fully connected directed topology
+            else:
+                raise ValueError("Invalid choice. Please select 1 or 2.")
+        elif self.num_of_robots == 3:
+            if topology == 1:
+                self.A = np.array([[0, 1, 0],
+                                [0, 0, 1],
+                                [1, 0, 0]])   # Ring topology
+            elif topology == 2:
+                self.A = np.array([[0, 1, 1],
+                                [1, 0, 1],
+                                [1, 1, 0]])  # Fully connected directed topology
+            else:
+                raise ValueError("Invalid choice. Please select 1 or 2.")
+
 
 
     def set_formation(self, formation):

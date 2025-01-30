@@ -10,7 +10,7 @@ from launch.substitutions import LaunchConfiguration, TextSubstitution
 def generate_launch_description():
     # Command-line argument for number of robots
     num_of_robots_launch_arg = DeclareLaunchArgument(
-        "num_of_robots", default_value=TextSubstitution(text="4")
+        "num_of_robots", default_value=TextSubstitution(text="3")
     )
 
     # Create multiple boid nodes
@@ -24,7 +24,7 @@ def generate_launch_description():
                 "num_of_robots": LaunchConfiguration('num_of_robots'),
                 "robot_id": i+1,
             }]
-        ) for i in range(4)
+        ) for i in range(3)
     ]
 
     return LaunchDescription([num_of_robots_launch_arg] + boid_nodes)

@@ -19,7 +19,7 @@ class ConsensusRendezvousController(Node):
 
         self.A = None   # Adjacency Matrix
 
-        self.num_of_robots = 4
+        self.num_of_robots = 3
 
         # PUBLISHERS
         self.vel_publishers = {f"cf_{i+1}": self.create_publisher(Twist, f"/cf_{i+1}/cmd_vel", 10) for i in range(self.num_of_robots)}

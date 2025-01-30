@@ -15,15 +15,15 @@ This project implements consensus protocols for multi-robot systems in ROS2, bui
 **Reynolds:**
 
 ```bash
-ros2 launch mrs_project_crazyflies reynolds.launch.py
+ros2 launch mrs_project_crazyflies reynolds.launch.py num_of_robots:=3
 ```
 
 **Consensus Rendezvous:**
 ```bash
-ros2 run mrs_project_crazyflies consensus_rendezvous --ros-args -p topology:=1
+ros2 run mrs_project_crazyflies consensus_rendezvous --ros-args -p num_of_robots:=3 -p topology:=1 
 ```
 **Consensus Formation:**
 ```bash
-ros2 launch mrs_project_crazyflies reynolds.launch.py 
-ros2 run mrs_project_crazyflies consensus_formation --ros-args -p topology:=1 -p formation:="square"```
+ros2 launch mrs_project_crazyflies reynolds.launch.py num_of_robots:=3
+ros2 run mrs_project_crazyflies consensus_formation --ros-args -p num_of_robots:=3 -p topology:=1 -p formation:="triangle"
 ```

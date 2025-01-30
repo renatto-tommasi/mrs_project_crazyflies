@@ -112,23 +112,38 @@ class ConsensusFormationController(Node):
             xi: nd.array (n,2) -> positions vector
         """
         scale = 2
-        if formation == "triangle":  # Triangle
-            formation = np.array([[0, 0],
-                                [1, 1],
-                                [1, 2],
-                                [2, 0]])
-        elif formation == "line":  # Line
-            formation = np.array([[0, 0],
-                                [1, 0],
-                                [2, 0],
-                                [3, 0]])
-        elif formation == "square":  # Square
-            formation = np.array([[0, 1],
-                                [1, 1],
-                                [1, 0],
-                                [0, 0]])*2
-        else:
-            raise ValueError("Invalid formation type. Please select 1, 2, or 3.")
+        if self.num_of_robots == 4:
+            if formation == "triangle":  # Triangle
+                formation = np.array([[0, 0],
+                                    [1, 1],
+                                    [1, 2],
+                                    [2, 0]])
+            elif formation == "line":  # Line
+                formation = np.array([[0, 0],
+                                    [1, 0],
+                                    [2, 0],
+                                    [3, 0]])
+            elif formation == "square":  # Square
+                formation = np.array([[0, 1],
+                                    [1, 1],
+                                    [1, 0],
+                                    [0, 0]])
+            else:
+                raise ValueError("Invalid formation type. Please select 1, 2, or 3.")
+        elif self.num_of_robots == 3:
+            if formation == "triangle":  # Triangle
+                formation = np.array([[0, 0],
+                                    [1, 2],
+                                    [2, 0]])
+            elif formation == "line_h":  # Line
+                formation = np.array([[0, 0],
+                                    [1, 0],
+                                    [2, 0]])
+            elif formation == "line_v":  # Square
+                formation = np.array([[0, 1],
+                                    [0, 1],
+                                    [0, 2]])
+
 
         self.formation = formation # Center the formation
 

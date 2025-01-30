@@ -22,7 +22,7 @@ class ConsensusFormationController(Node):
         self.A = None
         self.goal = None
 
-        self.leader = "cf_4"
+        self.leader = "cf_1"
 
         self.target = np.array([-1,1])
 
@@ -147,14 +147,14 @@ class ConsensusFormationController(Node):
                 self.formation = np.array([[0, 0],
                                     [1, 2],
                                     [2, 0]])
-            elif formation_name == "line_h":  # Line
+            elif formation_name == "line_h":  # Line horizontal
                 self.formation = np.array([[0, 0],
                                     [1, 0],
-                                    [2, 0]])
-            elif formation_name == "line_v":  # Square
-                self.formation = np.array([[0, 1],
+                                    [2, 0]])*1.5
+            elif formation_name == "line_v":  # Line vertical
+                self.formation = np.array([[0, 0],
                                     [0, 1],
-                                    [0, 2]])
+                                    [0, 2]])*1.5
 
 
         self.get_logger().info(f"Formation set to {formation_name}")
@@ -283,7 +283,7 @@ def main(args=None):
     node = Node("consensus_formation_controller")  # Create a temporary node for argument parsing
     topology = node.declare_parameter('topology', 1).value
     formation = node.declare_parameter('formation', 'triangle').value
-    num_of_robots = node.declare_parameter('num_of_robots', '3').value
+    num_of_robots = node.declare_parameter('num_of_robots', 3).value
     node.destroy_node()  # Destroy the temporary node
     # Instantiate the Consensus Controller
     controller = ConsensusFormationController()

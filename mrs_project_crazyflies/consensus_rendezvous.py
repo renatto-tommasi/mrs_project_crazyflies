@@ -227,7 +227,7 @@ def main(args=None):
     # Get topology and formation from command line arguments
     node = Node("consensus_formation_controller")  # Create a temporary node for argument parsing
     topology = node.declare_parameter('topology', 1).value
-    num_of_robots = node.declare_parameter('num_of_robots', '3').value
+    num_of_robots = node.declare_parameter('num_of_robots', 3).value
     node.destroy_node()  # Destroy the temporary node
     
     # Instantiate the Consensus Controller

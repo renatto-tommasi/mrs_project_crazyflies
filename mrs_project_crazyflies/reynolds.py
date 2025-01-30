@@ -97,6 +97,7 @@ class BoidController(Node):
         self.land_clients = [self.create_client(Land,f"/cf_{i+1}/land")for i in range(self.num_of_robots)]
         # Create a signal handler for SIGINT (Ctrl+C)
         signal.signal(signal.SIGINT, self.signal_handler)
+        self.land = False
 
     
     def save_map(self, map:OccupancyGrid):
@@ -105,7 +106,11 @@ class BoidController(Node):
         self.state_checker = StateValidityChecker(map)
 
     def consensus_control (self, msg:Twist):
-        self.vp = 0.5
+        self.vp = 0.3
+        self.k_sep = 0.2
+        self.k_all = 0
+        self.k_coh = 0
+
         self.consensus_vel = np.array([msg.linear.x, msg.linear.y]).reshape((2,1))
         self.destroy_subscription(self.goal_sub)
         self.last_message_time = self.get_clock().now()
@@ -118,6 +123,9 @@ class BoidController(Node):
         time_diff = self.get_clock().now() - self.last_message_time
         if time_diff.nanoseconds / 1e9 > self.timeout:
             self.vp = 20
+            self.k_sep = 0.45
+            self.k_all = 0.2
+            self.k_coh = 0.7
     
             self.goal_sub = self.create_subscription(PoseStamped, "/goal_pose", self.migratory_urge, 10)
             self.consensus_vel = None
@@ -321,6 +329,8 @@ class BoidController(Node):
         return agent_vel
     
     def publish_vel(self, vel):
+        if self.land:
+            return
 
         vel_msg = Twist()
         vel_msg.linear.x = float(vel[0])
@@ -399,13 +409,15 @@ class BoidController(Node):
         self.vel_pub.publish(twist_msg)
 
     def land_drones(self):
+        self.land = True
+        time.sleep(1.0) 
         req = NotifySetpointsStop.Request()
         for client in self.notify_clients:
             client.call_async(req)
 
         req = Land.Request()
         for client in self.land_clients:
-            req.height = 0
+            req.height = 0.0
             req.duration = rclpy.duration.Duration(seconds=2.0).to_msg()
             client.call_async(req)
         
@@ -414,10 +426,10 @@ class BoidController(Node):
     def signal_handler(self, signum, frame):
         # Get the logger and log a message
         self.get_logger().info('Received Ctrl+C, landing drones...')
-
+        self.destroy_publisher(self.vel_pub)
         # Call the land_drones method
         self.land_drones()
-
+        time.sleep(5.0) 
         # Continue with the shutdown process
         self.destroy_node()
         rclpy.shutdown()

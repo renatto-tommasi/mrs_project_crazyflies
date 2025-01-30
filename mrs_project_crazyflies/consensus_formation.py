@@ -76,10 +76,9 @@ class ConsensusFormationController(Node):
             self.A: nd.array (n,n) -> adjacency matrix
         """
         if topology == 1:
-            self.A = np.array([[0, 1, 0, 0],
-                             [0, 0, 1, 0],
-                             [0, 0, 0, 1],
-                             [1, 0, 0, 0]])  # Ring topology
+            self.A = np.array([[0, 1, 0],
+                             [0, 0, 1],
+                             [1, 0, 0]])  # Ring topology
         elif topology == 2:
             self.A = np.array([[0, 1, 0, 1],
                              [1, 0, 1, 0],
@@ -112,8 +111,7 @@ class ConsensusFormationController(Node):
         elif formation == "square":  # Square
             formation = np.array([[0, 1],
                                 [1, 1],
-                                [1, 0],
-                                [0, 0]])*2
+                                [1, 0]])*2
         else:
             raise ValueError("Invalid formation type. Please select 1, 2, or 3.")
 

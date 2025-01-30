@@ -29,7 +29,7 @@ BEHAVIOR_COLORS = [
 
 
 class BoidController(Node):
-    def __init__(self, k_all=0.2, k_sep=0.3, k_coh=0.7, k_mig=0.7, k_obs=2):
+    def __init__(self, k_all=0.2, k_sep=0.45, k_coh=0.7, k_mig=0.7, k_obs=2):
         super().__init__('reynolds_controller')
 
         # Declare parameters with default values
@@ -48,7 +48,7 @@ class BoidController(Node):
         self.k_coh = k_coh
         self.k_mig = k_mig
         self.k_obs = k_obs
-        self.vp = 10
+        self.vp = 2
         self.timeout = 1
 
         self.neighbors = {}
@@ -87,7 +87,7 @@ class BoidController(Node):
         self.timer = self.create_timer(self.dt, self.reynolds)
         self.chek_consensus = self.create_timer(0.5, self.check_topic_activity)  # Check every 1 second
 
-
+    
     def save_map(self, map:OccupancyGrid):
         self.get_logger().info(f"Node {self.drone} GOT MAP!!!")
 
@@ -125,6 +125,9 @@ class BoidController(Node):
         vl_y = msg.twist.twist.linear.y
         frame = msg.child_frame_id
 
+        if msg.pose.pose.position.z < 0.1:
+            self.launch_drone()
+
         if frame == self.drone:
             self.vel = np.array([vl_x, vl_y]).reshape(2, 1)
             self.orientation = self.get_orientation(self.vel)
@@ -143,11 +146,12 @@ class BoidController(Node):
         n_dist = np.linalg.norm(n_pos_rf[:2])
 
         if self.is_visible(n_dist, n_pos_rf[2], self.vp):
+                
                 self.neighbors[frame] = BoidState(pos=n_pos_rf, vel=vel, dist=n_dist)
         elif frame in self.neighbors:
                 del self.neighbors[frame]
 
-        # self.get_logger().info(f"Boid {self.drone} has {(self.neighbors)} Neighbors!")
+        self.get_logger().info(f"Boid {self.drone} has {(self.neighbors)} Neighbors!")
 
 
     def is_visible(self, n_dist, angle, max_distance=1, field_of_view=np.pi):
@@ -169,8 +173,8 @@ class BoidController(Node):
         allignment_acc = self.get_allignment_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
         cohesion_acc = self.get_cohesion_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
         separation_acc = self.get_separation_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
-        migration_acc = self.get_migration_acc() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
-        obstacle_acc = self.get_obstacle_avoidance() if len(self.neighbors) > 0 else np.zeros((2, 1)) 
+        migration_acc = self.get_migration_acc()
+        obstacle_acc = np.zeros((2, 1))
 
         vel = self.calculate_vel(allignment_acc, cohesion_acc, separation_acc, migration_acc, obstacle_acc)
 

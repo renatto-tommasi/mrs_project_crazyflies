@@ -43,6 +43,7 @@ setup(
                 'reynolds = mrs_project_crazyflies.reynolds:main',
                 'consensus_formation = mrs_project_crazyflies.consensus_formation:main',
                 'consensus_rendezvous = mrs_project_crazyflies.consensus_rendezvous:main'
+                'land = mrs_project_crazyflies.land:main'
             ],
         },
 )

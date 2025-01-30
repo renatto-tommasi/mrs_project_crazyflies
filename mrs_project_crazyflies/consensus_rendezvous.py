@@ -84,6 +84,10 @@ class ConsensusRendezvousController(Node):
         # Publish the updated path
         self.path_publishers[frame].publish(self.robot_paths[frame])
 
+    def set_num_of_robots(self, num_of_robots):
+        self.num_of_robots == num_of_robots
+        self.get_logger().info(f"Formation initialized with {self.num_of_robots} drones")
+
 
     
 
@@ -102,22 +106,28 @@ class ConsensusRendezvousController(Node):
                                 [0, 0, 1, 0],
                                 [0, 0, 0, 1],
                                 [1, 0, 0, 0]])  # Ring topology
+                self.get_logger().info(f"Topology set to: 1->2->3->4->1")
+                
             elif topology == 2:
                 self.A = np.array([[0, 1, 0, 1],
                                 [1, 0, 1, 0],
                                 [0, 1, 0, 1],
                                 [1, 0, 1, 0]])  # Fully connected directed topology
+                self.get_logger().info(f"Topology set to: 1<->2<->3<->4<->1")
+                
                 
             elif topology == 3:
                 self.A = np.array([[0, 0, 0, 1],
                                 [0, 0, 0, 0],
                                 [0, 1, 0, 0],
-                                [0, 0, 1, 0]])  # II: 1->4->3->2
+                                [0, 0, 1, 0]])  
+                self.get_logger().info(f"Topology set to: 1->4->3->2")
             elif topology == 4:
                 self.A = np.array([[0, 0, 1, 0],
                                 [1, 0, 0, 0],
                                 [0, 1, 0, 1],
                                 [0, 0, 0, 0]])  # II: 1->4->3->2
+                self.get_logger().info(f"Topology set to: 1->3->2->1, 3->4")
 
             else:
                 raise ValueError("Invalid choice. Please select 1, 2, 3 or 4.")
@@ -127,10 +137,14 @@ class ConsensusRendezvousController(Node):
                 self.A = np.array([[0, 1, 0],
                                 [0, 0, 1],
                                 [1, 0, 0]])   # Ring topology
+                self.get_logger().info(f"Topology set to: 1->2->3->1")
+                
             elif topology == 2:
                 self.A = np.array([[0, 1, 1],
                                 [1, 0, 1],
                                 [1, 1, 0]])  # Fully connected directed topology
+                self.get_logger().info(f"Topology set to: 1<->2<->3<->1")
+                
             else:
                 raise ValueError("Invalid choice. Please select 1 or 2.")
 
@@ -212,12 +226,15 @@ def main(args=None):
     # Get topology and formation from command line arguments
     node = Node("consensus_formation_controller")  # Create a temporary node for argument parsing
     topology = node.declare_parameter('topology', 1).value
+    num_of_robots = node.declare_parameter('num_of_robots', '3').value
     node.destroy_node()  # Destroy the temporary node
     
     # Instantiate the Consensus Controller
     controller = ConsensusRendezvousController()
-    controller.launch_drones()
+    controller.set_num_of_robots(num_of_robots)
     controller.set_topology(topology)
+    controller.launch_drones()
+    
 
     # Keep the node alive until manually interrupted
     rclpy.spin(controller)

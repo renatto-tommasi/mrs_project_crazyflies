@@ -6,7 +6,7 @@ from rclpy.node import Node
 import numpy as np
 from geometry_msgs.msg import Pose, Twist, PoseStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
-from nav_msgs.msg import Odometry, OccupancyGrid
+from nav_msgs.msg import Odometry, OccupancyGrid, Path
 from dataclasses import dataclass
 import math
 from mrs_project_crazyflies.svc import StateValidityChecker
@@ -99,6 +99,13 @@ class BoidController(Node):
         signal.signal(signal.SIGINT, self.signal_handler)
         self.land = False
 
+        # PLOT PATHS IN RVIZ
+
+        # Create publishers for each robot's path
+        self.robot_paths = {f"cf_{i+1}": Path() for i in range(self.num_of_robots)}
+        self.path_publishers = {f"cf_{i+1}": self.create_publisher(Path, f"/cf_{i+1}/path", 10) for i in range(self.num_of_robots)}
+
+
     
     def save_map(self, map:OccupancyGrid):
         self.get_logger().info(f"Node {self.drone} GOT MAP!!!")
@@ -137,6 +144,20 @@ class BoidController(Node):
         y_goal_wf = goal.pose.position.y
         self.migration_target = np.array([x_goal_wf, y_goal_wf]).reshape(2, 1)
 
+    def plot_path(self, msg:Odometry):
+        # PLOT PATH
+        frame = msg.child_frame_id
+        pose = PoseStamped()
+        pose.header = msg.header
+        pose.pose = msg.pose.pose
+
+        # Append the pose to the robot's path
+        self.robot_paths[frame].header = msg.header
+        self.robot_paths[frame].poses.append(pose)
+
+        # Publish the updated path
+        self.path_publishers[frame].publish(self.robot_paths[frame])
+
     def get_odom_callback(self, msg:Odometry):
         x = msg.pose.pose.position.x
         y = msg.pose.pose.position.y
@@ -156,6 +177,7 @@ class BoidController(Node):
         if self.p_wf is None:
             return
         
+        self.plot_path(msg)
         vel = np.array([vl_x, vl_y]).reshape(2, 1)
         n_pos_rf = np.array([0.0, 0.0, 0.0]).reshape(3, 1)
 

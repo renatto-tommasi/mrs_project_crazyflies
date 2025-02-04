@@ -14,7 +14,7 @@ class ConsensusFormationController(Node):
 
         self.get_logger().info(f"Consensus Formation Controller started correctly!")
 
-        self.num_of_robots = 3 # Manual for now
+        self.num_of_robots = 4 # Manual for now
 
         self.vel = {}               # Boid Velocities
         self.X = {}                 # Boid Locations
@@ -82,10 +82,10 @@ class ConsensusFormationController(Node):
                                 [0, 0, 0, 1],
                                 [1, 0, 0, 0]])  # Ring topology
             elif topology == 2:
-                self.A = np.array([[0, 1, 0, 1],
-                                [1, 0, 1, 0],
-                                [0, 1, 0, 1],
-                                [1, 0, 1, 0]])  # Fully connected directed topology
+                self.A = np.array([[0, 1, 1, 1],
+                                [1, 0, 1, 1],
+                                [1, 1, 0, 1],
+                                [1, 1, 1, 0]])  # Fully connected directed topology
             else:
                 raise ValueError("Invalid choice. Please select 1 or 2.")
         elif self.num_of_robots == 3:
@@ -168,6 +168,19 @@ class ConsensusFormationController(Node):
         V = -np.dot(laplacian_matrix, (X[:,:2] - xi))*self.dt
 
         return V
+    def get_leader(self):
+        min_distance = float('inf')
+        closest_key = None
+
+        for key, value in self.X.items():
+            
+            distance = np.linalg.norm(value[:2] - self.goal)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_key = key
+
+        return closest_key
     
     def calculate_goal_vel(self):
         drone_0 = self.X[self.leader]
@@ -177,7 +190,7 @@ class ConsensusFormationController(Node):
         mig_acc = mig_acc * np.linalg.norm(vector)**2
 
         # Clip the acceleration magnitude to 1 m/s²
-        max_acc = 1.0  # Maximum allowed acceleration in m/s²
+        max_acc = 1 # Maximum allowed acceleration in m/s²
         acc_norm = np.linalg.norm(mig_acc)
         
         if acc_norm > max_acc:
@@ -218,6 +231,7 @@ class ConsensusFormationController(Node):
         self.vel = self._matrix_to_dictionary(V)
 
         if self.goal is not None:
+            self.leader = self.get_leader()
             self.vel[self.leader] = self.calculate_goal_vel()
 
         self.get_logger().info(f"Robots Velocity: current={self.vel}")
